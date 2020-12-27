@@ -1,0 +1,29 @@
+{
+  "name": "erc20-events-fetcher",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc --project ./",
+    "start": "nodemon index.ts",
+    "test": "env TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register 'tests/**/*.ts'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^5.0.24",
+    "express": "4.17",
+    "lodash": "^4.17.20",
+    "mongodb": "^3.6.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.9",
+    "@types/mocha": "^8.2.0",
+    "@types/node": "^14.14.14",
+    "mocha": "^8.2.1",
+    "nodemon": "^2.0.6",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.1.3"
+  }
+}
