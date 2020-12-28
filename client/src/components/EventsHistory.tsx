@@ -32,15 +32,17 @@ function callGetHistory(account: string, token: string, chunksRange: number[]) {
 const EventsHistory: React.SFC<any> = function({account, token}) {
 
   const [latestChunk, setLatestChunk] = useState();
-
-  // const [events, setEvents] = useState([]);
-  // const [lastFetchedChunk, setLastFetchedChunk] = useState();
-
-  const [history, setHistory] = useState<IEventsHistory>({chunkBatches: [], lastFetchedChunk: undefined})
+  const [history, setHistory] = useState<IEventsHistory>({chunkBatches: [], lastFetchedChunk: undefined});
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     callGetLatestChunk().then(res => setLatestChunk(res.latestChunk));
   }, []);
+
+  // Start over when switching account or token
+  useEffect(() => {
+    setHistory({chunkBatches: [], lastFetchedChunk: undefined});
+  }, [account, token]);
 
   function loadMoreEvents() {
     if (!latestChunk) {
@@ -51,6 +53,7 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
     const lowChunk: number = Math.max(highChunk - CHUNK_BATCH_SIZE, 0);
     const chunkRange = [highChunk, lowChunk];
 
+    setIsLoading(true);
     callGetHistory(account, token, chunkRange).then(res => {
       console.log('received events', res)
 
@@ -64,7 +67,8 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
         chunkBatches,
         lastFetchedChunk: lowChunk,
       });
-    });
+    })
+    .finally(() => setIsLoading(false));
   }
 
   if (!latestChunk) {
@@ -84,9 +88,13 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
             {chunkBatch.chunkRangeEvents.map((event: any) => <EventLine event={event}/>)}
           </div>);
         })}
+        {isLoading ? <img style={{height: '16px'}} alt="Loading chunks..." src="./loading.gif"/> : <></>}
       </div>
       {history.lastFetchedChunk ? <div>(Last fetched chunk : {history.lastFetchedChunk})</div> : <></>}
-      <button onClick={() => loadMoreEvents()} disabled={history.lastFetchedChunk === 0}>Fetch more</button>
+      {history.lastFetchedChunk !== 0 
+        ? <button onClick={() => loadMoreEvents()} disabled={isLoading}>Fetch more</button>
+        : <span>(all history fetched)</span>
+      }
     </div>
   )
 }
