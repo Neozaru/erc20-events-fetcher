@@ -6,7 +6,6 @@ const provider = new providers.InfuraProvider("homestead", {
   projectSecret: 'd7f31210a379430d8b3f7a866548907a',
 });
 
-
 const erc20abi = require("./abis/erc20.abi.json");
 
 
@@ -73,8 +72,17 @@ function fetchEvents(contract, filter, formatter, blockHigh: number, blockLow: n
   });
 }
 
+export async function getTokenInfo(tokenAddress: string) {
+  const contract = new ethers.Contract(tokenAddress, erc20abi, provider);
+  return {
+    address: tokenAddress,
+    name: await contract.name(),
+    symbol: await contract.symbol(),
+    decimals: await contract.decimals(),
+  };
+}
 
-export async function fetchAllEvents(accountAddress, tokenAddress, blockHigh, blockLow) {
+export async function fetchAllEvents(accountAddress: string, tokenAddress: string, blockHigh: number, blockLow: number) {
 
   const contract = new ethers.Contract(tokenAddress, erc20abi, provider);
   let filterFrom: any = contract.filters.Transfer(accountAddress);

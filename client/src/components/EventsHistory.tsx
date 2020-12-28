@@ -29,7 +29,7 @@ function callGetHistory(account: string, token: string, chunksRange: number[]) {
   .then(res => res.json());
 }
 
-const EventsHistory: React.SFC<any> = function({account, token}) {
+const EventsHistory: React.SFC<any> = function({accountAddress, tokenInfo}) {
 
   const [latestChunk, setLatestChunk] = useState();
   const [history, setHistory] = useState<IEventsHistory>({chunkBatches: [], lastFetchedChunk: undefined});
@@ -42,7 +42,7 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
   // Start over when switching account or token
   useEffect(() => {
     setHistory({chunkBatches: [], lastFetchedChunk: undefined});
-  }, [account, token]);
+  }, [accountAddress, tokenInfo]);
 
   function loadMoreEvents() {
     if (!latestChunk) {
@@ -54,7 +54,7 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
     const chunkRange = [highChunk, lowChunk];
 
     setIsLoading(true);
-    callGetHistory(account, token, chunkRange).then(res => {
+    callGetHistory(accountAddress, tokenInfo.address, chunkRange).then(res => {
       console.log('received events', res)
 
       const chunkRangeEvents = res.history.map((chunkEvents: any) => chunkEvents.events).flat();
@@ -85,7 +85,7 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
           return (
             <div>
             <div>Chunks {chunkBatch.chunkRange[0]} - {chunkBatch.chunkRange[1]}</div>
-            {chunkBatch.chunkRangeEvents.map((event: any) => <EventLine event={event}/>)}
+            {chunkBatch.chunkRangeEvents.map((event: any) => <EventLine event={event} tokenInfo={tokenInfo}/>)}
           </div>);
         })}
         {isLoading ? <img style={{height: '16px'}} alt="Loading chunks..." src="./loading.gif"/> : <></>}

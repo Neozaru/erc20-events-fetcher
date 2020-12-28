@@ -35,17 +35,17 @@ const EditableAddress: React.SFC<any> = function({defaultValue = '', onValueEdit
 
   if (isEditing) {
     return (
-      <div>
+      <span>
         <input size={46} maxLength={42} value={currentInput.value} onChange={onInputChanged}></input> 
         <button onClick={() => onClickOk()} disabled={!currentInput.valid}>Ok</button>
-      </div>
+      </span>
     )
   } else {
     return (
-      <div>
+      <span>
         {currentInput.value} 
         <button onClick={() => onClickEdit()}>Edit</button>
-      </div>
+      </span>
     )
   }
 

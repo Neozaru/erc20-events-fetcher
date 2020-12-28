@@ -1,7 +1,7 @@
 import express from "express";
 import _ from "lodash";
 
-import { fetchAllEvents, getLatestChunk } from "./ethops";
+import { fetchAllEvents, getLatestChunk, getTokenInfo } from "./ethops";
 import { blockToChunk, chunkRangeToBlockRange, computeChunkRangesToFetch } from "./utils";
 import { fetchChunksFromDb, saveChunksToDb } from "./dbops";
 
@@ -30,6 +30,12 @@ app.use(express.json());
 app.get('/apis/1/chunks/latest', async (req, res) => {
   const latestChunk: number = await getLatestChunk();
   return res.send({latestChunk});
+});
+
+app.get('/apis/1/tokens/:tokenAddress', async (req, res) => {
+  const {tokenAddress} = req.params;
+  const tokenInfo = await getTokenInfo(tokenAddress);
+  return res.send(tokenInfo);
 });
 
 app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (req, res) => {
