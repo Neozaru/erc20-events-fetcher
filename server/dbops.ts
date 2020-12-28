@@ -1,7 +1,8 @@
 import { MongoClient } from 'mongodb';
 import _ from "lodash";
 
-const DB_ENDPOINT = "mongodb://localhost:27017/erc20tx";
+const DB_ENDPOINT = process.env.DB_ENDPOINT ?? "mongodb://localhost:27017/erc20tx";
+console.log('DB endpont', DB_ENDPOINT)
 
 const DB_COLLECTION = 'userTokenHistory';
 

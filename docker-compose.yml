@@ -1,0 +1,25 @@
+version: "3.9"
+services:
+  erc20-fetcher-client:
+    build: client/
+    container_name: erc20-fetcher-client
+    hostname: erc20-fetcher-client
+    ports:
+      - "3000:3000"
+    environment:
+      API_HOSTNAME: erc20-fetcher-server
+  erc20-fetcher-server:
+    build: server/
+    container_name: erc20-fetcher-server
+    hostname: erc20-fetcher-server
+    ports:
+      - "8000:8000"
+    environment:
+      DB_ENDPOINT: mongodb://erc20-fetcher-db:27017/erc20tx
+  erc20-fetcher-db:
+    image: mongo:latest
+    container_name: erc20-fetcher-db
+    hostname: erc20-fetcher-db
+    ports:
+      - "27017:27017"
+
