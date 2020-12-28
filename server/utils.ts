@@ -1,44 +1,37 @@
 
 import _ from "lodash";
 
-// export function computeChunkRangesToFetch(chunkHigh, chunkLow, alreadyFetched) {
-//   console.log('computeChunkRangeToFetch', alreadyFetched);
-//   const chunkRangesToFetch = [];
-//   let lastUnfetched;
-//   let currentUnfetchedRange = [];
-//   for (let i = chunkHigh; i >= chunkLow; i--) {
-//     // console.log(i, lastUnfetched, currentUnfetchedRange, lastUnfetched - i)
-//     if (!alreadyFetched.includes(i)) {
-//       console.log(i, 'not fetched')
-//       if (currentUnfetchedRange.length === 0) { // Range begins
-//         currentUnfetchedRange = [i];
-//       } else {
-//         if (_.isNumber(lastUnfetched) && lastUnfetched - i != 1) { // Range ends
-//           currentUnfetchedRange.push(lastUnfetched);
-//           chunkRangesToFetch.push(currentUnfetchedRange);
-//           currentUnfetchedRange = [i];
-//         }
-//       }
-//       lastUnfetched = i;
-//     } else {
-//       console.log(i, 'already fetched')
-//     }
-//   }
-//   if (currentUnfetchedRange.length === 1 && _.isNumber(lastUnfetched)) {
-//     currentUnfetchedRange.push(chunkLow);
-//     chunkRangesToFetch.push(currentUnfetchedRange);
-//   }
-//   return chunkRangesToFetch;
-// }
+// 1000 Blocks per chunks - about 4 hours
+const CHUNK_SIZE = 1000;
 
-export function computeChunkRangesToFetch(chunkHigh, chunkLow, alreadyFetched) {
-  // console.log('computeChunkRangeToFetch', alreadyFetched);
+export function blockToChunk(blockNumber: number) {
+  return Math.floor(blockNumber / CHUNK_SIZE);
+}
+
+function chunkToBlockRange(chunkNumber: number): any {
+  const lowBlock = chunkNumber * CHUNK_SIZE;
+  const highBlock = lowBlock + CHUNK_SIZE;
+  return [highBlock, lowBlock];
+}
+
+export function chunkRangeToBlockRange(chunkRange: number[]) {
+  return [chunkToBlockRange(chunkRange[0])[0], chunkToBlockRange(chunkRange[1])[1]]
+}
+
+/**
+ * 
+ * @param chunkHigh Higest chunk to be fetched
+ * @param chunkLow Lowest chunk to be fetched
+ * @param notToBeFetched List of chunks not to be fetched
+ * @returns An array of chunk ranges to be fetched.
+ * @see utils.tests.ts
+ */
+export function computeChunkRangesToFetch(chunkHigh, chunkLow, notToBeFetched): number[][] {
   const chunkRangesToFetch = [];
   let lastUnfetched;
   let currentUnfetchedRange = [];
   for (let i = chunkHigh; i >= chunkLow; i--) {
-    // console.log(i, lastUnfetched, currentUnfetchedRange, lastUnfetched - i)
-    if (!alreadyFetched.includes(i)) {
+    if (!notToBeFetched.includes(i)) {
       lastUnfetched = i;
       if (currentUnfetchedRange.length === 0) {
         currentUnfetchedRange.push(i);
@@ -49,7 +42,6 @@ export function computeChunkRangesToFetch(chunkHigh, chunkLow, alreadyFetched) {
         chunkRangesToFetch.push(currentUnfetchedRange);
         currentUnfetchedRange = [];
       }
-      // console.log(i, 'already fetched')
     }
   }
   if (currentUnfetchedRange.length === 1) {
