@@ -9,8 +9,8 @@ interface IEventsHistory {
   lastFetchedChunk: number | undefined;
 }
 
-function callGetCurrentChunk() {
-  return fetch(`${API_ENDPOINT}/chunks/current`, {
+function callGetLatestChunk() {
+  return fetch(`${API_ENDPOINT}/chunks/latest`, {
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json'
@@ -31,7 +31,7 @@ function callGetHistory(account: string, token: string, chunksRange: number[]) {
 
 const EventsHistory: React.SFC<any> = function({account, token}) {
 
-  const [currentChunk, setCurrentChunk] = useState();
+  const [latestChunk, setLatestChunk] = useState();
 
   // const [events, setEvents] = useState([]);
   // const [lastFetchedChunk, setLastFetchedChunk] = useState();
@@ -39,20 +39,18 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
   const [history, setHistory] = useState<IEventsHistory>({chunkBatches: [], lastFetchedChunk: undefined})
 
   useEffect(() => {
-    callGetCurrentChunk().then(res => setCurrentChunk(res.currentChunk));
+    callGetLatestChunk().then(res => setLatestChunk(res.latestChunk));
   }, []);
 
   function loadMoreEvents() {
-    if (!currentChunk) {
+    if (!latestChunk) {
       return;
     }
     // @ts-ignore
-    const highChunk: number = Math.min(history.lastFetchedChunk ? history.lastFetchedChunk - 1 : currentChunk, currentChunk);
+    const highChunk: number = Math.min(history.lastFetchedChunk ? history.lastFetchedChunk - 1 : latestChunk, latestChunk);
     const lowChunk: number = Math.max(highChunk - CHUNK_BATCH_SIZE, 0);
     const chunkRange = [highChunk, lowChunk];
-    // if (!highChunk) {
-    //   return;
-    // }
+
     callGetHistory(account, token, chunkRange).then(res => {
       console.log('received events', res)
 
@@ -69,14 +67,14 @@ const EventsHistory: React.SFC<any> = function({account, token}) {
     });
   }
 
-  if (!currentChunk) {
+  if (!latestChunk) {
     return (<div>Loading...</div>);
   }
 
   return (
     <div>
       <div>Events history here</div>
-      <div>Current chunk : {currentChunk}</div>
+      <div>Latest chunk : {latestChunk}</div>
 
       <div>
         {history.chunkBatches.map(chunkBatch => {

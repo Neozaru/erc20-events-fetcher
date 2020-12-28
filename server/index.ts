@@ -1,7 +1,7 @@
 import express from "express";
 import _ from "lodash";
 
-import { fetchAllEvents, getCurrentChunk } from "./ethops";
+import { fetchAllEvents, getLatestChunk } from "./ethops";
 import { blockToChunk, chunkRangeToBlockRange, computeChunkRangesToFetch } from "./utils";
 import { fetchChunksFromDb, saveChunksToDb } from "./dbops";
 
@@ -27,9 +27,9 @@ function enableCORSMiddleware (req, res, next) {
 app.use(enableCORSMiddleware);
 app.use(express.json());
 
-app.get('/apis/1/chunks/current', async (req, res) => {
-  const currentChunk: number = await getCurrentChunk();
-  return res.send({currentChunk});
+app.get('/apis/1/chunks/latest', async (req, res) => {
+  const latestChunk: number = await getLatestChunk();
+  return res.send({latestChunk});
 });
 
 app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (req, res) => {
@@ -38,10 +38,10 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
     return res.status(400).send({error: "chunkHigh and chunkLow must be specified"});
   }
   
-  const currentChunk = await getCurrentChunk();
+  const latestChunk = await getLatestChunk();
 
   // Highest chunk as requested by the user or corresponding to the latest block.
-  const chunkHigh: number = Math.min(parseInt(<string>req.query.chunkHigh), currentChunk);
+  const chunkHigh: number = Math.min(parseInt(<string>req.query.chunkHigh), latestChunk);
   const chunkLow: number = parseInt(<string>req.query.chunkLow);
 
   const dbHistory = await fetchChunksFromDb(accountAddress, tokenAddress, chunkHigh, chunkLow);
@@ -53,7 +53,7 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
   console.log('Chunk Ranges to fetch', chunkRangesToFetch);
 
   // We won't save the most recent chunks blocks to avoid saving a chunk in which new transactions can still occur + hard fork risk.
-  const chunksNotToSave = _.rangeRight(currentChunk, currentChunk - CHUNK_SAVE_AGE);
+  const chunksNotToSave = _.rangeRight(latestChunk, latestChunk - CHUNK_SAVE_AGE);
 
   const fetchs = _.map(chunkRangesToFetch, (chunkRange, index) => {
     const blockRange = chunkRangeToBlockRange(chunkRange);

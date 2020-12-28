@@ -99,7 +99,7 @@ export async function fetchAllEvents(accountAddress, tokenAddress, blockHigh, bl
   });
 }
 
-export async function getCurrentChunk(): Promise<number> {
+export async function getLatestChunk(): Promise<number> {
   const fetchedBlockNumber: any = await provider.getBlockNumber();
   return blockToChunk(fetchedBlockNumber);
 }
