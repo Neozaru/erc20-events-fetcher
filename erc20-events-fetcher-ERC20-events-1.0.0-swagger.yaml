@@ -1,0 +1,161 @@
+swagger: '2.0'
+info:
+  description: ERC20 Events Fetcher Documentation
+  version: 1.0.0
+  title: ERC20 Events Fetcher
+  contact:
+    email: neozaru.14@gmail.com
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+# host: erc20events.neozaru.com
+# basePath: /apis/1
+# tags:
+# - name: fetchEvents
+#   description: Everything about your Events
+#   externalDocs:
+#     description: Find out more
+#     url: http://swagger.io
+# schemes:
+# - http
+paths:
+  /chunks/latest:
+    get:
+      tags:
+      - getLatestChunk
+      summary: Retrieves latest chunk (corresponding to latest block)
+      operationId: getLatestChunk
+      produces: 
+      - application/json
+      responses:
+        500:
+          description: Internal error
+        200:
+          description: Latest chunk
+          schema:
+            $ref: '#/definitions/LatestChunk'
+  /tokens/{tokenAddress}:
+    get:
+      tags:
+      - getTokenInfo
+      summary: Retrieves standard information about an ERC20 token
+      operationId: getTokenInfo
+      produces: 
+      - application/json
+      parameters:
+      - name: tokenAddress
+        in: path
+        description: ETH address of the ERC20 token for which retrieve info
+        required: true
+        type: string
+      responses:
+        500:
+          description: Internal error
+        400:
+          description: Invalid token address format
+        200:
+          description: Token info
+          schema:
+            $ref: '#/definitions/TokenInfo'
+  /accounts/{accountAddress}/tokens/{tokenAddress}/events:
+    get:
+      tags:
+      - fetchEvents
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      parameters:
+      - name: accountAddress
+        in: path
+        description: ETH address of the account for which fetch events
+        required: true
+        type: string
+
+      - name: tokenAddress
+        in: path
+        description: ETH address of the ERC20 token for which fetch events
+        required: true
+        type: string
+        
+      - name: chunkHigh
+        in: query
+        description: Highest chunk of the range to be fetched
+        required: true
+        type: integer
+      - name: chunkLow
+        in: query
+        description: Highest chunk of the range to be fetched
+        required: true
+        type: integer
+      responses:
+        500:
+          description: Internal error
+        400:
+          description: Invalid account or token address format
+        200:
+          description: Events for chunk range
+          schema:
+            $ref: '#/definitions/ChunkRangeEvents'
+          # format: int64
+definitions:
+  TokenInfo:
+    type: object
+    properties:
+      name:
+        type: string
+        example: "DAI Stablecoin"
+      symbol:
+        type: string
+        example: "DAI"
+      decimals:
+        type: number
+        example: 18
+      address:
+        type: string
+        example: "0x6b175474e89094c44da98b954eedeac495271d0f"
+  LatestChunk:
+    type: object
+    properties:
+      latestChunk:
+        type: integer
+        format: int64
+        example: 11542
+  ChunkRangeEvents:
+    type: object
+    properties:
+      history:
+        type: array
+        items:
+          type: object
+          properties:
+            chunk:
+              type: integer
+              format: int64
+            events:
+              type: array
+              items:
+                type: object
+                properties:
+                  block:
+                    type: integer
+                    format: int64
+                  type:
+                    type: string
+                    enum: [TRANSFER, APPROVAL]
+                  params:
+                    type: object
+                    example:
+                      from: "0x92a0b2c089733bef43ac367d2ce7783526aea590"
+                      to: "0x48c3e2eeC8127EC2909DEA6f19dAa5614bF6e667"
+                      amount: 42
+# Added by API Auto Mocking Plugin
+# host: erc20events.neozaru.com
+# basePath: /apis/1
+schemes:
+ - https
+ - http
+# Added by API Auto Mocking Plugin
+basePath: /erc20-events-fetcher/ERC20-events/1.0.0
+# Added by API Auto Mocking Plugin
+host: localhost
