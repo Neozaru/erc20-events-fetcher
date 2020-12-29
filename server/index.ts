@@ -1,75 +1,75 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import _ from "lodash";
 
-import { fetchAllEvents, getLatestChunk, getTokenInfo } from "./ethops";
-import { blockToChunk, chunkRangeToBlockRange, computeChunkRangesToFetch } from "./utils";
-import { fetchChunksFromDb, saveChunksToDb } from "./dbops";
+import { fetchAllEvents, getLatestChunk, getTokenInfo, FormattedEvent } from "./ethops";
+import { blockToChunk, chunkRangeToBlockRange, computeChunkRangesToFetch, Range } from "./utils";
+import { fetchChunksFromDb, saveChunksToDb, EventsChunk } from "./dbops";
 
 // Ex: http://localhost:8000/apis/1/accounts/0x92A0b2C089733beF43Ac367D2CE7783526AEA590/tokens/0x6b175474e89094c44da98b954eedeac495271d0f/events?chunkHigh=11150&chunkLow=11100
 
 
-
 // Chunks corresponding to the last 4000 blocks (4 * 1000) - about 24 hours - are not saved to DB.
-const CHUNK_SAVE_AGE = 6;
+const CHUNK_SAVE_AGE: number = 6;
 
 const app = express();
-const PORT = 8000;
+const PORT: number = 8000;
 
 // https://stackoverflow.com/a/10271632/1636977
 // Not production-ready setup but OK for the exercice 
-function enableCORSMiddleware (req, res, next) {
+function enableCORSMiddleware (req: Request, res: Response, next: NextFunction) {
   res.setHeader('Access-Control-Allow-Origin', "*");
   res.setHeader('Access-Control-Allow-Headers', "*");
   res.setHeader('Access-Control-Allow-Methods', "*");
   
   next();
 }
+
 app.use(enableCORSMiddleware);
 app.use(express.json());
 
-app.get('/apis/1/chunks/latest', async (req, res) => {
+app.get('/apis/1/chunks/latest', async (req: Request, res: Response) => {
   const latestChunk: number = await getLatestChunk();
   return res.send({latestChunk});
 });
 
-app.get('/apis/1/tokens/:tokenAddress', async (req, res) => {
+app.get('/apis/1/tokens/:tokenAddress', async (req: Request, res: Response) => {
   const {tokenAddress} = req.params;
   const tokenInfo = await getTokenInfo(tokenAddress);
   return res.send(tokenInfo);
 });
 
-app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (req, res) => {
+app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (req: Request, res: Response) => {
   const {accountAddress, tokenAddress} = req.params;
   if (!req.query.chunkHigh || !req.query.chunkLow) {
     return res.status(400).send({error: "chunkHigh and chunkLow must be specified"});
   }
   
-  const latestChunk = await getLatestChunk();
+  const latestChunk: number = await getLatestChunk();
 
   // Highest chunk as requested by the user or corresponding to the latest block.
   const chunkHigh: number = Math.min(parseInt(<string>req.query.chunkHigh), latestChunk);
-  const chunkLow: number = parseInt(<string>req.query.chunkLow);
+  const chunkLow: number = Math.max(parseInt(<string>req.query.chunkLow), 0);
 
-  const dbHistory = await fetchChunksFromDb(accountAddress, tokenAddress, chunkHigh, chunkLow);
+  const dbHistory: EventsChunk[] = await fetchChunksFromDb(accountAddress, tokenAddress, chunkHigh, chunkLow);
   console.log('recorded history', dbHistory.length);
-  const chunksFetchedFromDb = _.map(dbHistory, 'chunk');
+  const chunksFetchedFromDb: number[] = _.map(dbHistory, 'chunk');
 
   // Fetching requested chunks, excluding those that were retrieved from DB (if any)
-  const chunkRangesToFetch = computeChunkRangesToFetch(chunkHigh, chunkLow, chunksFetchedFromDb);
+  const chunkRangesToFetch: Range[] = computeChunkRangesToFetch(chunkHigh, chunkLow, chunksFetchedFromDb);
   console.log('Chunk Ranges to fetch', chunkRangesToFetch);
 
   // We won't save the most recent chunks blocks to avoid saving a chunk in which new transactions can still occur + hard fork risk.
-  const chunksNotToSave = _.rangeRight(latestChunk, latestChunk - CHUNK_SAVE_AGE);
+  const chunksNotToSave: number[] = _.rangeRight(latestChunk, latestChunk - CHUNK_SAVE_AGE);
 
-  const fetchs = _.map(chunkRangesToFetch, (chunkRange, index) => {
-    const blockRange = chunkRangeToBlockRange(chunkRange);
-    return fetchAllEvents(accountAddress, tokenAddress, blockRange[0], blockRange[1]).then(events => {
+  const fetchs: Promise<EventsChunk[]>[] = _.map(chunkRangesToFetch, (chunkRange: [number, number]) => {
+    const blockRange: Range = chunkRangeToBlockRange(chunkRange);
+    return fetchAllEvents(accountAddress, tokenAddress, blockRange[0], blockRange[1]).then((events: FormattedEvent[]) => {
       console.log('Range', chunkRange[1], chunkRange[0])
 
       const fetchedChunks: number[] = _.range(chunkRange[1], chunkRange[0] + 1);
 
       // Creating an array of empty chunk history so fetched chunks are saved to DB
-      const chunkEvents = _.map(fetchedChunks, (chunk) => {
+      const eventsChunks: EventsChunk[] = _.map(fetchedChunks, (chunk: number) => {
         return {
           chunk,
           events: [],
@@ -77,25 +77,25 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
       })
 
       // Populating chunks that contain events
-      _.each(events, (e) => {
+      _.each(events, (e: FormattedEvent) => {
         const chunk = blockToChunk(e.block);
-        _.find(chunkEvents, {chunk}).events.push(e);
+        _.find(eventsChunks, {chunk}).events.push(e);
       });
 
-      console.log('ChunkEvents', chunkEvents.length, _.filter(chunkEvents, ce => ce.events.length > 0).length);
+      console.log('ChunkEvents', eventsChunks.length, _.filter(eventsChunks, ec => ec.events.length > 0).length);
 
       // Saving everything except the most recent chunks (if fetched)
-      const chunksToSave = chunkEvents.filter(ce => !chunksNotToSave.includes(ce.chunk));
+      const chunksToSave = eventsChunks.filter((ec: EventsChunk) => !chunksNotToSave.includes(ec.chunk));
       saveChunksToDb(accountAddress, tokenAddress, chunksToSave);
 
-      return chunkEvents;
+      return eventsChunks;
     })
   });
 
   // Pre-sorting could be done when requesting the DB 
-  return Promise.all(fetchs).then((fetchedHistory: any) => {
-    const dbAndFetchedHistory = dbHistory.concat(fetchedHistory.flat());
-    const eventsOnlyHistory = _.orderBy(dbAndFetchedHistory.filter(h => h.events.length > 0), 'chunk', 'desc');
+  return Promise.all(fetchs).then((fetchedHistory: EventsChunk[][]) => {
+    const dbAndFetchedHistory: EventsChunk[] = dbHistory.concat(_.flatten(fetchedHistory));
+    const eventsOnlyHistory: EventsChunk[] = _.orderBy(dbAndFetchedHistory.filter(h => h.events.length > 0), 'chunk', 'desc');
     return res.status(200).send({history: eventsOnlyHistory});
   });
 

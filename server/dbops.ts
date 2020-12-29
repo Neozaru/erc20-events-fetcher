@@ -6,6 +6,10 @@ console.log('DB endpoint', DB_ENDPOINT)
 
 const DB_COLLECTION = 'userTokenHistory';
 
+export interface EventsChunk {
+  chunk: number,
+  events: any[],
+}
 
 /** Chunks are stored in an sub-array inside "account-token" documents.
  *  Performances are terrible. Playing with projections in the requests 
@@ -15,7 +19,7 @@ const DB_COLLECTION = 'userTokenHistory';
  *  Otherwise, poor old relational database might be a good fit if keeping
  *  current design (?).
  */
-export function fetchChunksFromDb(account, token, chunkHigh, chunkLow) {
+export function fetchChunksFromDb(account: string, token: string, chunkHigh: number, chunkLow: number) {
   return MongoClient.connect(DB_ENDPOINT).then(async (db) => {
     const dbo = db.db('erc20tx');
     const cursor = await dbo.collection(DB_COLLECTION).aggregate([
@@ -40,7 +44,7 @@ export function fetchChunksFromDb(account, token, chunkHigh, chunkLow) {
   });
 }
 
-export function saveChunksToDb(account, token, chunksWithEvents) {
+export function saveChunksToDb(account: string, token: string, chunksWithEvents: EventsChunk[]) {
   return MongoClient.connect(DB_ENDPOINT).then(async (db) => {
     const dbo = db.db('erc20tx');
     const existingDoc = await dbo.collection(DB_COLLECTION).findOne({account, token});

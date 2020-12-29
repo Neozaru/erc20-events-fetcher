@@ -8,8 +8,33 @@ const provider = new providers.InfuraProvider("homestead", {
 
 const erc20abi = require("./abis/erc20.abi.json");
 
+interface TokenInfo {
+  address: string,
+  name: string,
+  symbol: string,
+  decimals: number,
+};
 
-function formatTransferLog(eventLog: any) {
+interface EventLog {
+  blockNumber: number,
+  args: any;
+}
+interface TransferEvent extends FormattedEvent {
+  params: {
+    from: string,
+    to: string,
+    value: BigNumber,
+  }
+}
+interface ApprovalEvent extends FormattedEvent {
+  params: {
+    owner: string,
+    spender: string,
+    value: BigNumber,
+  }
+}
+
+function formatTransferLog(eventLog: EventLog): TransferEvent {
   return {
     type: 'TRANSFER',
     block: eventLog.blockNumber,
@@ -21,7 +46,7 @@ function formatTransferLog(eventLog: any) {
   }
 }
 
-function formatApprovalLog(eventLog) {
+function formatApprovalLog(eventLog: EventLog): ApprovalEvent {
   return {
     type: 'APPROVAL',
     block: eventLog.blockNumber,
@@ -34,10 +59,10 @@ function formatApprovalLog(eventLog) {
 
 } 
 
-const MAX_ALLOWANCE = BigNumber.from(2).pow(256).sub(1);
+const MAX_ALLOWANCE: BigNumber = BigNumber.from(2).pow(256).sub(1);
 
 // Debug function (used on the front-end)
-function formatBN(bn, decimals: number) {
+function formatBN(bn: BigNumber, decimals: number): string {
   if (MAX_ALLOWANCE.eq(bn)) {
     return 'INFINITE';
   } else {
@@ -46,33 +71,42 @@ function formatBN(bn, decimals: number) {
 }
 
 // Debug function
-function printTransfer(transfer: any, decimals: number) {
+function printTransfer(transfer: TransferEvent, decimals: number): void {
   console.log(`${transfer.block} - TRANSFER - ${transfer.params.from} -> ${transfer.params.to} : ${formatBN(transfer.params.value, decimals)}`);
 }
 
 // Debug function
-function printApproval(approval: any, decimals: number) {
+function printApproval(approval: ApprovalEvent, decimals: number): void {
   console.log(`${approval.block} - APPROVAL - ${approval.params.owner} allowed ${approval.params.spender} to spend : ${formatBN(approval.params.value, decimals)}`);
 }
 
 
 // Debug function
-function printEvent(event: any, decimals: number) {
+function printEvent(event: FormattedEvent, decimals: number): void {
   if (event.type === 'TRANSFER') {
-    printTransfer(event, decimals);
+    printTransfer(<TransferEvent>event, decimals);
   } else {
-    printApproval(event, decimals);
+    printApproval(<ApprovalEvent>event, decimals);
   }
 }
 
 
-function fetchEvents(contract, filter, formatter, blockHigh: number, blockLow: number) {
+function fetchEvents(contract, filter, formatter, blockHigh: number, blockLow: number): Promise<FormattedEvent[]> {
   return contract.queryFilter(filter, blockLow, blockHigh).then((logs) => {
     return logs.map(formatter);
   });
 }
 
-export async function getTokenInfo(tokenAddress: string) {
+
+
+
+
+export interface FormattedEvent {
+  type: 'TRANSFER' | 'APPROVAL',
+  block: number,
+}
+
+export async function getTokenInfo(tokenAddress: string): Promise<TokenInfo> {
   const contract = new ethers.Contract(tokenAddress, erc20abi, provider);
   return {
     address: tokenAddress,
@@ -82,7 +116,7 @@ export async function getTokenInfo(tokenAddress: string) {
   };
 }
 
-export async function fetchAllEvents(accountAddress: string, tokenAddress: string, blockHigh: number, blockLow: number) {
+export async function fetchAllEvents(accountAddress: string, tokenAddress: string, blockHigh: number, blockLow: number): Promise<FormattedEvent[]> {
 
   const contract = new ethers.Contract(tokenAddress, erc20abi, provider);
   let filterFrom: any = contract.filters.Transfer(accountAddress);
@@ -102,7 +136,6 @@ export async function fetchAllEvents(accountAddress: string, tokenAddress: strin
   .then((events) => {
     events.forEach(tr => printEvent(tr, decimals));
     console.log(events.length, 'events')
-    // res.send(events);
     return events;
   });
 }

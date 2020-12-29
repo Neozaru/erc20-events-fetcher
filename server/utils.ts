@@ -4,17 +4,19 @@ import _ from "lodash";
 // 1000 Blocks per chunks - about 4 hours
 const CHUNK_SIZE = 1000;
 
-export function blockToChunk(blockNumber: number) {
-  return Math.floor(blockNumber / CHUNK_SIZE);
-}
-
-function chunkToBlockRange(chunkNumber: number): any {
+function chunkToBlockRange(chunkNumber: number): Range {
   const lowBlock = chunkNumber * CHUNK_SIZE;
   const highBlock = lowBlock + CHUNK_SIZE;
   return [highBlock, lowBlock];
 }
 
-export function chunkRangeToBlockRange(chunkRange: number[]) {
+export type Range = [number, number];
+
+export function blockToChunk(blockNumber: number): number {
+  return Math.floor(blockNumber / CHUNK_SIZE);
+}
+
+export function chunkRangeToBlockRange(chunkRange: Range): Range {
   return [chunkToBlockRange(chunkRange[0])[0], chunkToBlockRange(chunkRange[1])[1]]
 }
 
@@ -26,10 +28,10 @@ export function chunkRangeToBlockRange(chunkRange: number[]) {
  * @returns An array of chunk ranges to be fetched.
  * @see utils.tests.ts
  */
-export function computeChunkRangesToFetch(chunkHigh, chunkLow, notToBeFetched): number[][] {
-  const chunkRangesToFetch = [];
-  let lastUnfetched;
-  let currentUnfetchedRange = [];
+export function computeChunkRangesToFetch(chunkHigh: number, chunkLow: number, notToBeFetched: number[]): Range[] {
+  const chunkRangesToFetch: Range[] = [];
+  let lastUnfetched: number;
+  let currentUnfetchedRange: number[] | Range = [];
   for (let i = chunkHigh; i >= chunkLow; i--) {
     if (!notToBeFetched.includes(i)) {
       lastUnfetched = i;
@@ -39,14 +41,14 @@ export function computeChunkRangesToFetch(chunkHigh, chunkLow, notToBeFetched): 
     } else {
       if (currentUnfetchedRange.length === 1) {
         currentUnfetchedRange.push(lastUnfetched);
-        chunkRangesToFetch.push(currentUnfetchedRange);
+        chunkRangesToFetch.push(<Range>currentUnfetchedRange);
         currentUnfetchedRange = [];
       }
     }
   }
   if (currentUnfetchedRange.length === 1) {
     currentUnfetchedRange.push(lastUnfetched);
-    chunkRangesToFetch.push(currentUnfetchedRange);
+    chunkRangesToFetch.push(<Range>currentUnfetchedRange);
   }
   return chunkRangesToFetch;
 }
