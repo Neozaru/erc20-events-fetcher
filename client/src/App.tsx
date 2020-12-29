@@ -40,7 +40,7 @@ function App() {
           Account: <EditableAddress onValueEdited={setAccountAddress} />
         </div>
         <div>
-          Token: <EditableAddress defaultValue={tokenAddress} onValueEdited={setTokenAddress} /> {tokenInfo ? `(${tokenInfo.symbol})` : ''}
+          Token: <EditableAddress defaultValue={tokenAddress} onValueEdited={setTokenAddress} /> {tokenInfo ? `(${tokenInfo.symbol ?? 'invalid token'})` : ''}
         </div>
       </div>
       {
