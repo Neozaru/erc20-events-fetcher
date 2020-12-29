@@ -56,7 +56,13 @@ const CRITICAL_ERROR_GENERIC = {error: 'Critical error while retrieving history.
 
 app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (req: Request, res: Response) => {
   const {accountAddress, tokenAddress} = req.params;
-  if (!req.query.chunkHigh || !req.query.chunkLow) {
+
+  /* Input checks */
+  if (!isETHAddress(accountAddress)) {
+    return res.status(400).send({error: `Wrong account address : ${accountAddress}. Token address should follow ETH address format.`})
+  } else if (!isETHAddress(tokenAddress)) {
+    return res.status(400).send({error: `Wrong token address : ${tokenAddress}. Token address should follow ETH address format.`})
+  } else if (!req.query.chunkHigh || !req.query.chunkLow) {
     return res.status(400).send({error: "Both 'chunkHigh' and 'chunkLow' query parameters must be specified"});
   }
 
@@ -66,6 +72,7 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
   if (!_.isFinite(inputChunkHighInt) || !_.isFinite(inputChunkLowInt)) {
     return res.status(400).send({error: "Both 'chunkHigh' and 'chunkLow' query parameters must be valid integers"});
   }
+  /***/
 
   let latestChunk: number;
   try {
@@ -98,7 +105,8 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
 
   const fetchs: Promise<EventsChunk[]>[] = _.map(chunkRangesToFetch, (chunkRange: [number, number]) => {
     const blockRange: Range = chunkRangeToBlockRange(chunkRange);
-    return fetchAllEvents(accountAddress, tokenAddress, blockRange[0], blockRange[1]).then(async (events: FormattedEvent[]) => {
+    return fetchAllEvents(accountAddress, tokenAddress, blockRange[0], blockRange[1])
+    .then(async (events: FormattedEvent[]) => {
       console.log('Range', chunkRange[1], chunkRange[0])
 
       const fetchedChunks: number[] = _.range(chunkRange[1], chunkRange[0] + 1);
@@ -125,18 +133,35 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
         await saveChunksToDb(accountAddress, tokenAddress, chunksToSave);
       } catch (err) {
         console.error('Error while saving chunks to DB', err);
-        return res.status(500).send(CRITICAL_ERROR_GENERIC);    
+        res.status(500).send(CRITICAL_ERROR_GENERIC);
+        throw err;
       }
 
       return eventsChunks;
     })
+    .catch((err) => {
+      console.error('Error while fetching history in blockchain', err);
+      if (err.code === 'INVALID_ARGUMENT') { // Bad ETH address format
+        res.status(400).send({error: `Unable to fetch history for account ${accountAddress} with token ${tokenAddress}. Please check that both account and token addresses are correct`});  
+      } else {
+        res.status(500).send(CRITICAL_ERROR_GENERIC);
+      }
+      throw err;
+    });
   });
 
   // Pre-sorting could be done when requesting the DB 
-  return Promise.all(fetchs).then((fetchedHistory: EventsChunk[][]) => {
+  return Promise.all(fetchs)
+  .then((fetchedHistory: EventsChunk[][]) => {
     const dbAndFetchedHistory: EventsChunk[] = dbHistory.concat(_.flatten(fetchedHistory));
     const eventsOnlyHistory: EventsChunk[] = _.orderBy(dbAndFetchedHistory.filter(h => h.events.length > 0), 'chunk', 'desc');
     return res.status(200).send({history: eventsOnlyHistory});
+  })
+  .catch((err) => { // Generic error cases when not handled before
+    if (!res.headersSent) {
+      console.error('Unknown error', err);
+      return res.status(500).send(CRITICAL_ERROR_GENERIC);
+    }
   });
 
 });
