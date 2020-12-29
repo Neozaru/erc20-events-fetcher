@@ -1,8 +1,8 @@
 import express, { Request, Response, NextFunction } from "express";
 import _ from "lodash";
 
-import { fetchAllEvents, getLatestChunk, getTokenInfo, FormattedEvent } from "./ethops";
-import { blockToChunk, chunkRangeToBlockRange, computeChunkRangesToFetch, Range } from "./utils";
+import { fetchAllEvents, getLatestChunk, getTokenInfo, FormattedEvent, TokenInfo } from "./ethops";
+import { blockToChunk, chunkRangeToBlockRange, computeChunkRangesToFetch, isETHAddress, Range } from "./utils";
 import { fetchChunksFromDb, saveChunksToDb, EventsChunk } from "./dbops";
 
 // Ex: http://localhost:8000/apis/1/accounts/0x92A0b2C089733beF43Ac367D2CE7783526AEA590/tokens/0x6b175474e89094c44da98b954eedeac495271d0f/events?chunkHigh=11150&chunkLow=11100
@@ -28,29 +28,64 @@ app.use(enableCORSMiddleware);
 app.use(express.json());
 
 app.get('/apis/1/chunks/latest', async (req: Request, res: Response) => {
-  const latestChunk: number = await getLatestChunk();
-  return res.send({latestChunk});
+  return getLatestChunk()
+  .then((latestChunk: number) => res.send({latestChunk}))
+  .catch((err) => {
+    console.log('Error while retrieving latest chunk', err);
+    return res.status(500).send({error: 'Critical error while retrieving latest chunk.'});
+  });
 });
 
 app.get('/apis/1/tokens/:tokenAddress', async (req: Request, res: Response) => {
   const {tokenAddress} = req.params;
-  const tokenInfo = await getTokenInfo(tokenAddress);
-  return res.send(tokenInfo);
+  if (!isETHAddress(tokenAddress)) {
+    return res.status(400).send({error: `Wrong token address : ${tokenAddress}. Token address should follow ETH address format.`})
+  }
+  return getTokenInfo(tokenAddress)
+  .then((tokenInfo: TokenInfo) => {
+    return res.send(tokenInfo);
+  })
+  .catch((err) => {
+    console.log('Error while retrieving token info', err);
+    // Likely to be a wrong input from user (400) but also possible with server errors (hence generic error 500)
+    return res.status(500).send({error: `Unable to retrieve information for ${tokenAddress}. Please check that the address corresponds to an standard ERC20 token.`});
+  });
 });
+
+const CRITICAL_ERROR_GENERIC = {error: 'Critical error while retrieving history.'};
 
 app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (req: Request, res: Response) => {
   const {accountAddress, tokenAddress} = req.params;
   if (!req.query.chunkHigh || !req.query.chunkLow) {
-    return res.status(400).send({error: "chunkHigh and chunkLow must be specified"});
+    return res.status(400).send({error: "Both 'chunkHigh' and 'chunkLow' query parameters must be specified"});
   }
-  
-  const latestChunk: number = await getLatestChunk();
+
+  const inputChunkHighInt = parseInt(<string>req.query.chunkHigh);
+  const inputChunkLowInt = parseInt(<string>req.query.chunkLow);
+
+  if (!_.isFinite(inputChunkHighInt) || !_.isFinite(inputChunkLowInt)) {
+    return res.status(400).send({error: "Both 'chunkHigh' and 'chunkLow' query parameters must be valid integers"});
+  }
+
+  let latestChunk: number;
+  try {
+    latestChunk = await getLatestChunk();
+  } catch (err) {
+    console.error('Error while retrieving latest chunk', err);
+    return res.status(500).send(CRITICAL_ERROR_GENERIC);
+  }
 
   // Highest chunk as requested by the user or corresponding to the latest block.
-  const chunkHigh: number = Math.min(parseInt(<string>req.query.chunkHigh), latestChunk);
-  const chunkLow: number = Math.max(parseInt(<string>req.query.chunkLow), 0);
+  const chunkHigh: number = Math.min(inputChunkHighInt, latestChunk);
+  const chunkLow: number = Math.max(inputChunkLowInt, 0);
 
-  const dbHistory: EventsChunk[] = await fetchChunksFromDb(accountAddress, tokenAddress, chunkHigh, chunkLow);
+  let dbHistory: EventsChunk[];
+  try {
+    dbHistory = await fetchChunksFromDb(accountAddress, tokenAddress, chunkHigh, chunkLow);
+  } catch (err) {
+    console.error('Error while fetching chunks from DB', err);
+    return res.status(500).send(CRITICAL_ERROR_GENERIC);
+  }
   console.log('recorded history', dbHistory.length);
   const chunksFetchedFromDb: number[] = _.map(dbHistory, 'chunk');
 
@@ -63,7 +98,7 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
 
   const fetchs: Promise<EventsChunk[]>[] = _.map(chunkRangesToFetch, (chunkRange: [number, number]) => {
     const blockRange: Range = chunkRangeToBlockRange(chunkRange);
-    return fetchAllEvents(accountAddress, tokenAddress, blockRange[0], blockRange[1]).then((events: FormattedEvent[]) => {
+    return fetchAllEvents(accountAddress, tokenAddress, blockRange[0], blockRange[1]).then(async (events: FormattedEvent[]) => {
       console.log('Range', chunkRange[1], chunkRange[0])
 
       const fetchedChunks: number[] = _.range(chunkRange[1], chunkRange[0] + 1);
@@ -86,7 +121,12 @@ app.get('/apis/1/accounts/:accountAddress/tokens/:tokenAddress/events', async (r
 
       // Saving everything except the most recent chunks (if fetched)
       const chunksToSave = eventsChunks.filter((ec: EventsChunk) => !chunksNotToSave.includes(ec.chunk));
-      saveChunksToDb(accountAddress, tokenAddress, chunksToSave);
+      try {
+        await saveChunksToDb(accountAddress, tokenAddress, chunksToSave);
+      } catch (err) {
+        console.error('Error while saving chunks to DB', err);
+        return res.status(500).send(CRITICAL_ERROR_GENERIC);    
+      }
 
       return eventsChunks;
     })

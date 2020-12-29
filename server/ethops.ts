@@ -7,14 +7,6 @@ const provider = new providers.InfuraProvider("homestead", {
 });
 
 const erc20abi = require("./abis/erc20.abi.json");
-
-interface TokenInfo {
-  address: string,
-  name: string,
-  symbol: string,
-  decimals: number,
-};
-
 interface EventLog {
   blockNumber: number,
   args: any;
@@ -100,6 +92,12 @@ function fetchEvents(contract, filter, formatter, blockHigh: number, blockLow: n
 
 
 
+export interface TokenInfo {
+  address: string,
+  name: string,
+  symbol: string,
+  decimals: number,
+};
 
 export interface FormattedEvent {
   type: 'TRANSFER' | 'APPROVAL',

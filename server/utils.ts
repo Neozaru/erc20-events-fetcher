@@ -1,6 +1,12 @@
 
 import _ from "lodash";
 
+
+
+export function isETHAddress(input: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(input);
+}
+
 // 1000 Blocks per chunks - about 4 hours
 const CHUNK_SIZE = 1000;
 
