@@ -34,7 +34,7 @@ function App() {
   }, [tokenAddress]);
 
   return (
-    <div>
+    <body>
       <div>
         <div>
           Account: <EditableAddress onValueEdited={setAccountAddress} />
@@ -51,7 +51,7 @@ function App() {
         </div>
       : <div>Select token and account</div>
       }
-    </div>
+    </body>
   );
 }
 
